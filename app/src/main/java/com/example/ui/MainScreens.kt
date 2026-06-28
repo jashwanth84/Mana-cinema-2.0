@@ -847,7 +847,12 @@ fun HomeScreen(
                                 model = heroMovie.backdrop.ifEmpty { heroMovie.poster },
                                 contentDescription = null,
                                 contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize().scale(scale.value)
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .graphicsLayer {
+                                        scaleX = scale.value
+                                        scaleY = scale.value
+                                    }
                             )
                             // Warm vertical dark film gradient
                             Box(
@@ -3130,8 +3135,8 @@ fun ProfileSelectionScreen(
             verticalArrangement = Arrangement.Center,
             modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
         ) {
-            Image(
-                painter = painterResource(id = com.example.R.drawable.ic_movie_pro_logo),
+            AsyncImage(
+                model = com.example.R.drawable.img_app_logo,
                 contentDescription = "Mana Cinema Logo",
                 modifier = Modifier
                     .size(110.dp)

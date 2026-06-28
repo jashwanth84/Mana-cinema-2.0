@@ -29,6 +29,7 @@ import com.example.ui.MainAppContainer
 import com.example.ui.MovieViewModel
 import com.example.ui.theme.MovieHuntTheme
 import com.google.firebase.auth.FirebaseAuth
+import coil.compose.AsyncImage
 
 class MainActivity : ComponentActivity() {
 
@@ -230,9 +231,9 @@ fun SplashScreen() {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                // Render the generated custom Mana Cinema logo
-                Image(
-                    painter = painterResource(id = com.example.R.drawable.ic_movie_pro_logo),
+                // Render the generated custom Mana Cinema logo asynchronously and optimized with Coil
+                AsyncImage(
+                    model = com.example.R.drawable.img_app_logo,
                     contentDescription = "Mana Cinema Logo",
                     modifier = Modifier
                         .size(160.dp)

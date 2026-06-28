@@ -229,14 +229,69 @@ fun OTTVideoPlayer(
 
     var audioTrackGroups by remember { mutableStateOf<List<androidx.media3.common.Tracks.Group>>(emptyList()) }
     var textTrackGroups by remember { mutableStateOf<List<androidx.media3.common.Tracks.Group>>(emptyList()) }
+    var videoTrackGroups by remember { mutableStateOf<List<androidx.media3.common.Tracks.Group>>(emptyList()) }
     var showTrackDialog by remember { mutableStateOf(false) }
+    var showQualityDialog by remember { mutableStateOf(false) }
     var showSpeedDialog by remember { mutableStateOf(false) }
+    var showServerDialog by remember { mutableStateOf(false) }
 
-    LaunchedEffect(videoUrl) {
-        if (videoUrl.isNotBlank()) {
-            val uri = if (videoUrl.startsWith("/")) android.net.Uri.fromFile(java.io.File(videoUrl)) else android.net.Uri.parse(videoUrl)
+    var currentVideoUrl by remember(videoUrl) { mutableStateOf(videoUrl) }
+    var playbackError by remember { mutableStateOf<String?>(null) }
+    var hasSeeked by remember { mutableStateOf(false) }
+
+    val fallbackSources = remember {
+        listOf(
+            Pair("Server 1 (HLS 1080p - Sintel Demo)", "https://bitdash-a.akamaihd.net/content/sintel/hls/playlist.m3u8"),
+            Pair("Server 2 (HLS 1080p - Mux Trailer)", "https://test-streams.mux.dev/x36xhg/x36xhg.m3u8"),
+            Pair("Server 3 (HLS 720p - Tears of Steel)", "https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/tears-of-steel.ism/.m3u8"),
+            Pair("Server 4 (MP4 - Elephants Dream)", "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4"),
+            Pair("Server 5 (MP4 - Big Buck Bunny)", "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4")
+        )
+    }
+
+    DisposableEffect(exoPlayer) {
+        val listener = object : Player.Listener {
+            override fun onTracksChanged(tracks: androidx.media3.common.Tracks) {
+                audioTrackGroups = tracks.groups.filter { it.type == androidx.media3.common.C.TRACK_TYPE_AUDIO }
+                textTrackGroups = tracks.groups.filter { it.type == androidx.media3.common.C.TRACK_TYPE_TEXT }
+                videoTrackGroups = tracks.groups.filter { it.type == androidx.media3.common.C.TRACK_TYPE_VIDEO }
+            }
+            override fun onPlaybackStateChanged(state: Int) {
+                isBuffering = state == Player.STATE_BUFFERING
+                if (state == Player.STATE_READY) {
+                    playbackError = null
+                    if (initialProgress > 0f && !hasSeeked) {
+                        val dur = exoPlayer.duration
+                        if (dur > 0) {
+                            exoPlayer.seekTo((dur * initialProgress).toLong())
+                            hasSeeked = true
+                        }
+                    }
+                }
+            }
+            override fun onIsPlayingChanged(playing: Boolean) {
+                isPlaying = playing
+            }
+            override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                android.util.Log.e("VideoPlayerView", "Playback failed on URL: $currentVideoUrl", error)
+                isBuffering = false
+                playbackError = "Unable to load stream. The server might be offline or the URL has expired.\n\nError: ${error.localizedMessage ?: "Unknown connection failure"}"
+            }
+        }
+        exoPlayer.addListener(listener)
+        onDispose {
+            exoPlayer.removeListener(listener)
+        }
+    }
+
+    LaunchedEffect(currentVideoUrl) {
+        hasSeeked = false
+        playbackError = null
+        if (currentVideoUrl.isNotBlank()) {
+            isBuffering = true
+            val uri = if (currentVideoUrl.startsWith("/")) android.net.Uri.fromFile(java.io.File(currentVideoUrl)) else android.net.Uri.parse(currentVideoUrl)
             val builder = MediaItem.Builder().setUri(uri)
-            val lower = videoUrl.lowercase().trim()
+            val lower = currentVideoUrl.lowercase().trim()
             val mimeType = when {
                 lower.contains("m3u8") -> "application/x-mpegURL"
                 lower.contains("mpd") -> "application/dash+xml"
@@ -249,27 +304,10 @@ fun OTTVideoPlayer(
             
             exoPlayer.setMediaItem(builder.build())
             exoPlayer.prepare()
-
-            var hasSeeked = false
-            exoPlayer.addListener(object : Player.Listener {
-                override fun onTracksChanged(tracks: androidx.media3.common.Tracks) {
-                    audioTrackGroups = tracks.groups.filter { it.type == androidx.media3.common.C.TRACK_TYPE_AUDIO }
-                    textTrackGroups = tracks.groups.filter { it.type == androidx.media3.common.C.TRACK_TYPE_TEXT }
-                }
-                override fun onPlaybackStateChanged(state: Int) {
-                    isBuffering = state == Player.STATE_BUFFERING
-                    if (state == Player.STATE_READY && initialProgress > 0f && !hasSeeked) {
-                        val dur = exoPlayer.duration
-                        if (dur > 0) {
-                            exoPlayer.seekTo((dur * initialProgress).toLong())
-                            hasSeeked = true
-                        }
-                    }
-                }
-                override fun onIsPlayingChanged(playing: Boolean) {
-                    isPlaying = playing
-                }
-            })
+            exoPlayer.play()
+        } else {
+            isBuffering = false
+            playbackError = "No streaming URL is configured for this title in the database.\n\nPlease select one of the high-speed public CDN backup servers below to watch and test!"
         }
     }
 
@@ -395,6 +433,103 @@ fun OTTVideoPlayer(
             )
         }
 
+        if (playbackError != null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.92f))
+                    .padding(24.dp)
+                    .pointerInput(Unit) { detectTapGestures { } } // Block touches behind
+                    .safeDrawingPadding(),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                    modifier = Modifier.widthIn(max = 520.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Warning,
+                        contentDescription = "Playback Error",
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(64.dp)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "Server Connection Failed",
+                        color = Color.White,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = playbackError ?: "",
+                        color = Color.LightGray,
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    )
+                    Spacer(modifier = Modifier.height(24.dp))
+                    
+                    Text(
+                        text = "Switch to a Working Streaming Server:",
+                        color = Color.White,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.align(Alignment.Start).padding(bottom = 8.dp)
+                    )
+                    
+                    androidx.compose.foundation.lazy.LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)
+                    ) {
+                        items(fallbackSources.size) { index ->
+                            val source = fallbackSources[index]
+                            val isSelected = currentVideoUrl == source.second
+                            Button(
+                                onClick = {
+                                    currentVideoUrl = source.second
+                                    playbackError = null
+                                },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (isSelected) MaterialTheme.colorScheme.primary else Color.DarkGray,
+                                    contentColor = Color.White
+                                )
+                            ) {
+                                Text(source.first.substringBefore(" ("))
+                            }
+                        }
+                    }
+
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedButton(
+                            onClick = onBackClick,
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color.White)
+                        ) {
+                            Text("Go Back")
+                        }
+                        
+                        Button(
+                            onClick = {
+                                val temp = currentVideoUrl
+                                currentVideoUrl = ""
+                                currentVideoUrl = temp
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                        ) {
+                            Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Retry")
+                        }
+                    }
+                }
+            }
+        }
+
         if (showBrightness) {
             GestureIndicator(icon = Icons.Default.BrightnessMedium, level = brightnessLevel, modifier = Modifier.align(Alignment.CenterStart).padding(start = 32.dp))
         }
@@ -445,8 +580,16 @@ fun OTTVideoPlayer(
                             modifier = Modifier.weight(1f).padding(horizontal = 16.dp)
                         )
                         
+                        IconButton(onClick = { showQualityDialog = true }) {
+                            Icon(Icons.Default.Settings, "Stream Quality", tint = Color.White)
+                        }
+
                         IconButton(onClick = { showTrackDialog = true }) {
                             Icon(Icons.Default.Subtitles, "Audio and Subtitles", tint = Color.White)
+                        }
+
+                        IconButton(onClick = { showServerDialog = true }) {
+                            Icon(Icons.Default.Dns, "Switch Streaming Server", tint = Color.White)
                         }
 
                         IconButton(onClick = {
@@ -571,6 +714,221 @@ fun OTTVideoPlayer(
             }
         }
 
+        if (showQualityDialog) {
+            val isAutoSelected = !videoTrackGroups.any { group ->
+                trackSelector.parameters.overrides.containsKey(group.mediaTrackGroup)
+            }
+
+            AlertDialog(
+                onDismissRequest = { showQualityDialog = false },
+                title = { 
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Settings,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Text("Stream Quality", style = MaterialTheme.typography.titleLarge)
+                    }
+                },
+                text = {
+                    androidx.compose.foundation.lazy.LazyColumn(
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        // 1. Auto Selection Option
+                        item {
+                            Surface(
+                                onClick = {
+                                    trackSelector.setParameters(
+                                        trackSelector.buildUponParameters()
+                                            .clearOverridesOfType(androidx.media3.common.C.TRACK_TYPE_VIDEO)
+                                    )
+                                    showQualityDialog = false
+                                },
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (isAutoSelected) {
+                                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                                } else {
+                                    Color.Transparent
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(min = 48.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                                ) {
+                                    RadioButton(
+                                        selected = isAutoSelected,
+                                        onClick = null,
+                                        colors = RadioButtonDefaults.colors(
+                                            selectedColor = MaterialTheme.colorScheme.primary
+                                        )
+                                    )
+                                    Spacer(modifier = Modifier.width(16.dp))
+                                    Column {
+                                        Text(
+                                            "Auto (Adaptive)",
+                                            style = MaterialTheme.typography.bodyLarge.copy(
+                                                fontWeight = if (isAutoSelected) FontWeight.Bold else FontWeight.Normal
+                                            ),
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Text(
+                                            "Adjusts quality dynamically based on network speed",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // Divider between Auto and Manual options
+                        item {
+                            Spacer(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 8.dp)
+                                    .height(1.dp)
+                                    .background(MaterialTheme.colorScheme.outlineVariant)
+                            )
+                        }
+
+                        // 2. Manual Options
+                        if (videoTrackGroups.isEmpty()) {
+                            item {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 16.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        "No quality options available",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        } else {
+                            videoTrackGroups.forEach { group ->
+                                for (i in 0 until group.length) {
+                                    if (group.isTrackSupported(i)) {
+                                        val format = group.getTrackFormat(i)
+                                        val height = format.height
+                                        val bitrate = format.bitrate
+                                        val label = format.label
+
+                                        val trackName = when {
+                                            !label.isNullOrEmpty() -> label
+                                            height > 0 -> {
+                                                val fps = if (format.frameRate > 0) " @ ${format.frameRate.toInt()}fps" else ""
+                                                "${height}p$fps"
+                                            }
+                                            bitrate > 0 -> "${bitrate / 1000} kbps"
+                                            else -> "Quality Option ${i + 1}"
+                                        }
+
+                                        val override = trackSelector.parameters.overrides[group.mediaTrackGroup]
+                                        val isCurrentOverride = override != null && override.trackIndices.contains(i)
+                                        val isCurrentlyPlaying = group.isTrackSelected(i)
+
+                                        val isSelected = isCurrentOverride || (isAutoSelected && isCurrentlyPlaying)
+
+                                        item {
+                                            Surface(
+                                                onClick = {
+                                                    trackSelector.setParameters(
+                                                        trackSelector.buildUponParameters()
+                                                            .setOverrideForType(
+                                                                androidx.media3.common.TrackSelectionOverride(
+                                                                    group.mediaTrackGroup,
+                                                                    i
+                                                                )
+                                                            )
+                                                    )
+                                                    showQualityDialog = false
+                                                },
+                                                shape = RoundedCornerShape(8.dp),
+                                                color = if (isSelected) {
+                                                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                                                } else {
+                                                    Color.Transparent
+                                                },
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .heightIn(min = 48.dp)
+                                            ) {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                                                ) {
+                                                    RadioButton(
+                                                        selected = isCurrentOverride,
+                                                        onClick = null,
+                                                        colors = RadioButtonDefaults.colors(
+                                                            selectedColor = MaterialTheme.colorScheme.primary
+                                                        )
+                                                    )
+                                                    Spacer(modifier = Modifier.width(16.dp))
+                                                    Column(modifier = Modifier.weight(1f)) {
+                                                        Text(
+                                                            trackName,
+                                                            style = MaterialTheme.typography.bodyLarge.copy(
+                                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                                            ),
+                                                            color = MaterialTheme.colorScheme.onSurface
+                                                        )
+                                                        if (bitrate > 0) {
+                                                            Text(
+                                                                "Bitrate: ${(bitrate / 1000f / 1000f).let { String.format(java.util.Locale.US, "%.2f", it) }} Mbps",
+                                                                style = MaterialTheme.typography.bodySmall,
+                                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                            )
+                                                        }
+                                                    }
+                                                    if (isCurrentlyPlaying) {
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .clip(RoundedCornerShape(4.dp))
+                                                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
+                                                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                                                        ) {
+                                                            Text(
+                                                                "Active",
+                                                                style = MaterialTheme.typography.labelSmall,
+                                                                color = MaterialTheme.colorScheme.primary,
+                                                                fontWeight = FontWeight.Bold
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { showQualityDialog = false }) {
+                        Text("Close", style = MaterialTheme.typography.labelLarge)
+                    }
+                }
+            )
+        }
+
         if (showTrackDialog) {
             AlertDialog(
                 onDismissRequest = { showTrackDialog = false },
@@ -650,6 +1008,75 @@ fun OTTVideoPlayer(
                     }
                 },
                 confirmButton = { TextButton(onClick = { showSpeedDialog = false }) { Text("Close") } }
+            )
+        }
+
+        if (showServerDialog) {
+            AlertDialog(
+                onDismissRequest = { showServerDialog = false },
+                title = {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Dns,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Text("Switch Streaming Server")
+                    }
+                },
+                text = {
+                    Column {
+                        Text(
+                            text = "If the current server is buffering or fails to play, select an alternative CDN stream from our high-speed public backup servers:",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(bottom = 16.dp)
+                        )
+                        fallbackSources.forEach { source ->
+                            val isSelected = currentVideoUrl == source.second
+                            TextButton(
+                                onClick = {
+                                    currentVideoUrl = source.second
+                                    playbackError = null
+                                    showServerDialog = false
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = ButtonDefaults.textButtonColors(
+                                    containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f) else Color.Transparent
+                                )
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = source.first,
+                                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    if (isSelected) {
+                                        Icon(
+                                            Icons.Default.Done,
+                                            contentDescription = "Active",
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { showServerDialog = false }) {
+                        Text("Close")
+                    }
+                }
             )
         }
     }

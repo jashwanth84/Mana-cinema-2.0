@@ -122,8 +122,8 @@ fun AuthScreen(
             verticalArrangement = Arrangement.Center
         ) {
             // Elegant Branded Mana Cinema Header
-            Image(
-                painter = painterResource(id = com.example.R.drawable.ic_movie_pro_logo),
+            AsyncImage(
+                model = com.example.R.drawable.img_app_logo,
                 contentDescription = "Mana Cinema Logo",
                 modifier = Modifier
                     .size(120.dp)
