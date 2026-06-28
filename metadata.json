@@ -1,0 +1,8 @@
+{
+  "name": "Mana Cinema",
+  "description": "A high-performance Android movie streaming platform with ExoPlayer, Firebase integration, and modern MVVM architecture for seamless cinematic experiences.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
