@@ -383,7 +383,7 @@ class MovieViewModel(application: Application) : AndroidViewModel(application) {
                 _currentUserProfile.value = UserProfile(
                     uid = user.uid,
                     displayName = displayName,
-                    email = user.email ?: "viewer@moviehunt.com",
+                    email = user.email ?: "viewer@manacinema.com",
                     photoURL = photoUrl,
                     gender = gender,
                     createdAt = System.currentTimeMillis()
@@ -397,7 +397,7 @@ class MovieViewModel(application: Application) : AndroidViewModel(application) {
                 _currentUserProfile.value = UserProfile(
                     uid = user.uid,
                     displayName = displayName,
-                    email = "guest@moviehunt.com",
+                    email = "guest@manacinema.com",
                     photoURL = photoUrl,
                     gender = gender,
                     createdAt = System.currentTimeMillis()
@@ -411,7 +411,7 @@ class MovieViewModel(application: Application) : AndroidViewModel(application) {
                 _currentUserProfile.value = UserProfile(
                     uid = "guest_user",
                     displayName = displayName,
-                    email = "guest@moviehunt.com",
+                    email = "guest@manacinema.com",
                     photoURL = photoUrl,
                     gender = gender,
                     createdAt = System.currentTimeMillis()
@@ -426,7 +426,7 @@ class MovieViewModel(application: Application) : AndroidViewModel(application) {
             _currentUserProfile.value = UserProfile(
                 uid = "guest_user",
                 displayName = "Guest User",
-                email = "guest@moviehunt.com",
+                email = "guest@manacinema.com",
                 photoURL = "https://i.ibb.co/yBNK21P/avatar1.jpg",
                 gender = "male",
                 createdAt = System.currentTimeMillis()

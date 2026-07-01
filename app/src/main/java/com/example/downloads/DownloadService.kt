@@ -267,7 +267,7 @@ class DownloadService : Service() {
 
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("MOVIEHUNT: $title")
+            .setContentTitle("Mana Cinema: $title")
             .setContentText(contentText)
             .setSmallIcon(R.drawable.ic_launcher_foreground) // Make sure you have a valid icon
             .setProgress(100, progress, false)

@@ -13,5 +13,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "MovieHunt"
+rootProject.name = "Mana Cinema"
 include(":app")

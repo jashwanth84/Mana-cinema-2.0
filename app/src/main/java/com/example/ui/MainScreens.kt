@@ -2881,7 +2881,7 @@ fun SearchScreen(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(48.dp), tint = Color.Gray)
                     Spacer(modifier = Modifier.height(12.dp))
-                    Text("Search everything movie on MovieHunt", color = Color.Gray)
+                    Text("Search everything on Mana Cinema", color = Color.Gray)
                 }
             }
         } else if (filteredMovies.isEmpty() && filteredSeries.isEmpty()) {
