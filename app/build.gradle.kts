@@ -92,3 +92,18 @@ dependencies {
     // Test libs
     testImplementation("junit:junit:4.13.2")
 }
+
+tasks.register("copyApk") {
+    dependsOn("assembleDebug")
+    doLast {
+        val apkFile = File(layout.buildDirectory.dir("outputs/apk/debug").get().asFile, "app-debug.apk")
+        val destFile = File(rootProject.projectDir, "Mana_Cinema.apk")
+        if (apkFile.exists()) {
+            apkFile.copyTo(destFile, overwrite = true)
+            println("Successfully copied APK to ${destFile.absolutePath}")
+        } else {
+            throw GradleException("Source APK not found at ${apkFile.absolutePath}")
+        }
+    }
+}
+
