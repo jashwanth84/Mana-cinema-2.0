@@ -100,7 +100,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             // Dynamic thematic settings collection
-            val sharedPrefs = remember { this@MainActivity.getSharedPreferences("moviehunt_prefs", Context.MODE_PRIVATE) }
+            val sharedPrefs = remember { this@MainActivity.getSharedPreferences("infinity_movie_prefs", Context.MODE_PRIVATE) }
             var activeThemeName by remember { mutableStateOf(sharedPrefs.getString("active_theme", "classic-red") ?: "classic-red") }
             var isThemeDark by remember { mutableStateOf(sharedPrefs.getBoolean("is_theme_dark", true)) }
 
@@ -233,7 +233,7 @@ fun SplashScreen() {
             ) {
                 // Render the generated custom Mana Cinema logo asynchronously and optimized with Coil
                 AsyncImage(
-                    model = com.example.R.drawable.img_app_logo,
+                    model = com.example.R.drawable.ic_movie_pro_logo,
                     contentDescription = "Mana Cinema Logo",
                     modifier = Modifier
                         .size(160.dp)

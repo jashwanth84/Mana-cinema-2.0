@@ -123,7 +123,7 @@ fun AuthScreen(
         ) {
             // Elegant Branded Mana Cinema Header
             AsyncImage(
-                model = com.example.R.drawable.img_app_logo,
+                model = com.example.R.drawable.ic_movie_pro_logo,
                 contentDescription = "Mana Cinema Logo",
                 modifier = Modifier
                     .size(120.dp)

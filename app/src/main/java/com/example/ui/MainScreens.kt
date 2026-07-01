@@ -1071,7 +1071,7 @@ fun HomeScreen(
 
         // Category Rows
         items(categories) { categoryName ->
-            val catMovies = movies.filter { it.category == categoryName }
+            val catMovies = movies.filter { it.category.ifBlank { "Movies" } == categoryName }
             if (catMovies.isNotEmpty()) {
                 CategoryGridRow(
                     categoryName = categoryName,
@@ -1322,224 +1322,241 @@ fun CategoryGridRow(
 }
 
 // ------------------ SERIES SCREEN ------------------
+@OptIn(ExperimentalMaterialApi::class)
 @Composable
 fun SeriesScreen(
     viewModel: MovieViewModel,
     onNavigateToSeries: (WebSeries) -> Unit
 ) {
     val webSeries by viewModel.webSeries.collectAsState()
+    val isRefreshing by viewModel.isRefreshing.collectAsState()
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = 24.dp)
-    ) {
-        item {
-            Text(
-                text = "Web Series",
-                color = Color.White,
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(16.dp)
-            )
-        }
+    val pullRefreshState = rememberPullRefreshState(
+        refreshing = isRefreshing,
+        onRefresh = { viewModel.refreshData() }
+    )
 
-        if (webSeries.isNotEmpty()) {
-            val hero = webSeries.first()
+    Box(modifier = Modifier.fillMaxSize().pullRefresh(pullRefreshState)) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(bottom = 24.dp)
+        ) {
             item {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(290.dp)
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
-                        .clickable { onNavigateToSeries(hero) },
-                    shape = RoundedCornerShape(16.dp),
-                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.15f))
-                ) {
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        AsyncImage(
-                            model = hero.backdrop.ifEmpty { hero.poster },
-                            contentDescription = null,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(
-                                    Brush.verticalGradient(
-                                        colors = listOf(
-                                            Color.Black.copy(alpha = 0.3f),
-                                            Color.Transparent,
-                                            Color.Black.copy(alpha = 0.95f)
+                Text(
+                    text = "Web Series",
+                    color = Color.White,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(16.dp)
+                )
+            }
+
+            if (webSeries.isNotEmpty()) {
+                val hero = webSeries.first()
+                item {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(290.dp)
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                            .clickable { onNavigateToSeries(hero) },
+                        shape = RoundedCornerShape(16.dp),
+                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.15f))
+                    ) {
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            AsyncImage(
+                                model = hero.backdrop.ifEmpty { hero.poster },
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(
+                                        Brush.verticalGradient(
+                                            colors = listOf(
+                                                Color.Black.copy(alpha = 0.3f),
+                                                Color.Transparent,
+                                                Color.Black.copy(alpha = 0.95f)
+                                            )
                                         )
                                     )
-                                )
-                        )
-                        
-                        // Top Left - FEATURED
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.TopStart)
-                                .padding(16.dp)
-                                .background(
-                                    MaterialTheme.colorScheme.primary,
-                                    RoundedCornerShape(6.dp)
-                                )
-                                .padding(horizontal = 8.dp, vertical = 4.dp)
-                        ) {
-                            Text(
-                                text = "FEATURED SHOW",
-                                color = Color.White,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Black,
-                                letterSpacing = 0.5.sp
                             )
-                        }
-
-                        // Bottom Info Row
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .align(Alignment.BottomStart)
-                                .padding(16.dp),
-                            verticalAlignment = Alignment.Bottom,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
+                            
+                            // Top Left - FEATURED
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.TopStart)
+                                    .padding(16.dp)
+                                    .background(
+                                        MaterialTheme.colorScheme.primary,
+                                        RoundedCornerShape(6.dp)
+                                    )
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
                                 Text(
-                                    text = hero.title,
+                                    text = "FEATURED SHOW",
                                     color = Color.White,
-                                    fontSize = 22.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Black,
+                                    letterSpacing = 0.5.sp
                                 )
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        modifier = Modifier
-                                            .background(Color.White.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
-                                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Star,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.size(12.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(3.dp))
-                                        Text(
-                                            text = hero.rating,
-                                            color = Color.White,
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    }
+                            }
+
+                            // Bottom Info Row
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .align(Alignment.BottomStart)
+                                    .padding(16.dp),
+                                verticalAlignment = Alignment.Bottom,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = "${hero.year} • ${hero.genre.split("/").firstOrNull()?.trim() ?: hero.genre}",
-                                        color = Color.LightGray,
-                                        fontSize = 12.sp,
+                                        text = hero.title,
+                                        color = Color.White,
+                                        fontSize = 22.sp,
+                                        fontWeight = FontWeight.Bold,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier
+                                                .background(Color.White.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
+                                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Star,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(12.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(3.dp))
+                                            Text(
+                                                text = hero.rating,
+                                                color = Color.White,
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                        Text(
+                                            text = "${hero.year} • ${hero.genre.split("/").firstOrNull()?.trim() ?: hero.genre}",
+                                            color = Color.LightGray,
+                                            fontSize = 12.sp,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.width(12.dp))
+
+                                // Action button
+                                Box(
+                                    modifier = Modifier
+                                        .size(46.dp)
+                                        .clip(CircleShape)
+                                        .background(Color.White)
+                                        .clickable { onNavigateToSeries(hero) },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.PlayArrow,
+                                        contentDescription = "Show Details",
+                                        tint = Color.Black,
+                                        modifier = Modifier.size(24.dp)
+                                    )
                                 }
                             }
-
-                            Spacer(modifier = Modifier.width(12.dp))
-
-                            // Action button
-                            Box(
-                                modifier = Modifier
-                                    .size(46.dp)
-                                    .clip(CircleShape)
-                                    .background(Color.White)
-                                    .clickable { onNavigateToSeries(hero) },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.PlayArrow,
-                                    contentDescription = "Show Details",
-                                    tint = Color.Black,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                            }
                         }
                     }
                 }
             }
-        }
 
-        item { Spacer(modifier = Modifier.height(16.dp)) }
+            item { Spacer(modifier = Modifier.height(16.dp)) }
 
-        items(webSeries) { show ->
-            Card(
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF121218)),
-                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 6.dp)
-                    .clickable { onNavigateToSeries(show) }
-            ) {
-                Row(
+            items(webSeries) { show ->
+                Card(
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF121218)),
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(10.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                        .padding(horizontal = 16.dp, vertical = 6.dp)
+                        .clickable { onNavigateToSeries(show) }
                 ) {
-                    Card(
-                        modifier = Modifier.size(75.dp, 105.dp),
-                        shape = RoundedCornerShape(10.dp)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        AsyncImage(
-                            model = show.poster,
-                            contentDescription = null,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(14.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            show.title,
-                            color = Color.White,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.Star,
+                        Card(
+                            modifier = Modifier.size(75.dp, 105.dp),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            AsyncImage(
+                                model = show.poster,
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(12.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                "★ ${show.rating} • ${show.genre.split("/").firstOrNull()?.trim() ?: show.genre} • ${show.year}",
-                                color = Color.Gray,
-                                fontSize = 12.sp
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
                             )
                         }
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = show.storyline,
-                            color = Color.LightGray,
-                            fontSize = 12.sp,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                            lineHeight = 16.sp
-                        )
+                        Spacer(modifier = Modifier.width(14.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                show.title,
+                                color = Color.White,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.Star,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(12.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    "★ ${show.rating} • ${show.genre.split("/").firstOrNull()?.trim() ?: show.genre} • ${show.year}",
+                                    color = Color.Gray,
+                                    fontSize = 12.sp
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = show.storyline,
+                                color = Color.LightGray,
+                                fontSize = 12.sp,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                                lineHeight = 16.sp
+                            )
+                        }
                     }
                 }
             }
         }
+
+        PullRefreshIndicator(
+            refreshing = isRefreshing,
+            state = pullRefreshState,
+            modifier = Modifier.align(Alignment.TopCenter),
+            backgroundColor = MaterialTheme.colorScheme.surface,
+            contentColor = MaterialTheme.colorScheme.primary
+        )
     }
 }
 
@@ -1789,6 +1806,76 @@ fun ProfileScreen(
     val activeProfile by viewModel.activeProfile.collectAsState()
     val profiles by viewModel.profiles.collectAsState()
     val isGuest by viewModel.isGuestUser.collectAsState()
+
+    var showClearMoviesDialog by remember { mutableStateOf(false) }
+    var showClearSeriesDialog by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+
+    if (showClearMoviesDialog) {
+        AlertDialog(
+            onDismissRequest = { showClearMoviesDialog = false },
+            title = { Text("Clear All Movies", color = Color.White) },
+            text = { Text("Are you sure you want to delete ALL movies from Firebase and local cache?", color = Color.LightGray) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showClearMoviesDialog = false
+                        viewModel.clearAllMovies { success ->
+                            if (success) {
+                                Toast.makeText(context, "All movies deleted", Toast.LENGTH_SHORT).show()
+                            } else {
+                                Toast.makeText(context, "Clear failed", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Clear All", color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearMoviesDialog = false }) {
+                    Text("Cancel", color = Color.LightGray)
+                }
+            },
+            containerColor = Color(0xFF1E1E1E),
+            textContentColor = Color.LightGray,
+            titleContentColor = Color.White
+        )
+    }
+
+    if (showClearSeriesDialog) {
+        AlertDialog(
+            onDismissRequest = { showClearSeriesDialog = false },
+            title = { Text("Clear All Web Series", color = Color.White) },
+            text = { Text("Are you sure you want to delete ALL web series from Firebase and local cache?", color = Color.LightGray) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showClearSeriesDialog = false
+                        viewModel.clearAllWebSeries { success ->
+                            if (success) {
+                                Toast.makeText(context, "All web series deleted", Toast.LENGTH_SHORT).show()
+                            } else {
+                                Toast.makeText(context, "Clear failed", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Clear All", color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearSeriesDialog = false }) {
+                    Text("Cancel", color = Color.LightGray)
+                }
+            },
+            containerColor = Color(0xFF1E1E1E),
+            textContentColor = Color.LightGray,
+            titleContentColor = Color.White
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -2043,6 +2130,7 @@ fun iOSRowItem(
                 "Themes & Appearance" -> Color(0xFFFF2D55)
                 "Account Settings" -> Color(0xFF8E8E93)
                 "Ads Diagnostics & Test" -> Color(0xFFFF9F0A)
+                "Clear Firebase Movies", "Clear Firebase Series" -> Color(0xFFFF3B30)
                 else -> Color(0xFF8E8E93)
             }
         }
@@ -2349,6 +2437,7 @@ fun DetailScreen(
     val watchlist by viewModel.watchlist.collectAsState()
     val movies by viewModel.movies.collectAsState()
     val isFav = watchlist.any { it.id == movie.id }
+    val context = LocalContext.current
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -2429,7 +2518,6 @@ fun DetailScreen(
                         Text("Watch Now", fontWeight = FontWeight.Bold)
                     }
 
-                    val context = LocalContext.current
                     IconButton(
                         onClick = { 
                             com.example.downloads.DownloadService.startAction(
@@ -3136,7 +3224,7 @@ fun ProfileSelectionScreen(
             modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
         ) {
             AsyncImage(
-                model = com.example.R.drawable.img_app_logo,
+                model = com.example.R.drawable.ic_movie_pro_logo,
                 contentDescription = "Mana Cinema Logo",
                 modifier = Modifier
                     .size(110.dp)

@@ -18,7 +18,7 @@ class MovieRepository(context: Context) {
 
     private val dbInstance: FirebaseDatabase? by lazy {
         try {
-            FirebaseDatabase.getInstance("https://new-moviehunt-default-rtdb.firebaseio.com")
+            FirebaseDatabase.getInstance("https://infinity-earning-app-default-rtdb.asia-southeast1.firebasedatabase.app")
         } catch (e: Exception) {
             android.util.Log.e("MovieRepository", "FirebaseDatabase initialization failed", e)
             null
@@ -568,5 +568,29 @@ class MovieRepository(context: Context) {
             android.util.Log.e("MovieRepository", "Error requesting movie via Firebase", e)
             onComplete(false)
         }
+    }
+
+    fun deleteMovieFromFirebase(movieId: String, onComplete: (Boolean) -> Unit) {
+        val db = dbInstance ?: run { onComplete(false); return }
+        db.getReference("movies").child(movieId).removeValue()
+            .addOnCompleteListener { onComplete(it.isSuccessful) }
+    }
+
+    fun deleteSeriesFromFirebase(seriesId: String, onComplete: (Boolean) -> Unit) {
+        val db = dbInstance ?: run { onComplete(false); return }
+        db.getReference("webseries").child(seriesId).removeValue()
+            .addOnCompleteListener { onComplete(it.isSuccessful) }
+    }
+
+    fun clearAllMoviesFromFirebase(onComplete: (Boolean) -> Unit) {
+        val db = dbInstance ?: run { onComplete(false); return }
+        db.getReference("movies").removeValue()
+            .addOnCompleteListener { onComplete(it.isSuccessful) }
+    }
+
+    fun clearAllSeriesFromFirebase(onComplete: (Boolean) -> Unit) {
+        val db = dbInstance ?: run { onComplete(false); return }
+        db.getReference("webseries").removeValue()
+            .addOnCompleteListener { onComplete(it.isSuccessful) }
     }
 }

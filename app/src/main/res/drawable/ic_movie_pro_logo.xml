@@ -7,9 +7,7 @@
     android:viewportHeight="108">
 
     <!-- Overall Dark Semi-transparent Base for contrast -->
-    <path
-        android:fillColor="#121217"
-        android:pathData="M 0 0 h 108 v 108 h -108 z" />
+    <!-- (Background path removed for transparency) -->
 
     <!-- Group of coordinates shifted/centered -->
     <group

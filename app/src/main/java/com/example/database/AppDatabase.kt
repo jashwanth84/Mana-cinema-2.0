@@ -13,7 +13,7 @@ import androidx.room.RoomDatabase
         ContinueWatchingEntity::class,
         DownloadEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -28,7 +28,7 @@ abstract class AppDatabase : RoomDatabase() {
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     AppDatabase::class.java,
-                    "moviehunt_database"
+                    "infinity_movie_database"
                 )
                 .fallbackToDestructiveMigration()
                 .build()

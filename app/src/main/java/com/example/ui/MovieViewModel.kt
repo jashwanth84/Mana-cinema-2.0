@@ -13,7 +13,7 @@ import kotlinx.coroutines.launch
 class MovieViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = MovieRepository(application)
-    private val sharedPrefs = application.getSharedPreferences("moviehunt_prefs", Context.MODE_PRIVATE)
+    private val sharedPrefs = application.getSharedPreferences("infinity_movie_prefs", Context.MODE_PRIVATE)
 
     // --- Floating Video Player State ---
     data class FloatingVideoState(
@@ -435,7 +435,7 @@ class MovieViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun updateCategories(moviesList: List<Movie>) {
-        _categories.value = moviesList.map { it.category }.distinct().filter { it.isNotBlank() }
+        _categories.value = moviesList.map { it.category.ifBlank { "Movies" } }.distinct()
     }
 
     fun handleGuestLogin() {
@@ -450,6 +450,64 @@ class MovieViewModel(application: Application) : AndroidViewModel(application) {
 
     fun handleAuthUpdate() {
         observeUserSession()
+    }
+
+    fun deleteMovie(movieId: String, onComplete: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            repository.deleteMovieFromFirebase(movieId) { success ->
+                if (success) {
+                    _movies.value = _movies.value.filter { it.id != movieId }
+                    updateCategories(_movies.value)
+                    viewModelScope.launch {
+                        repository.saveMoviesToLocal(_movies.value)
+                    }
+                }
+                onComplete(success)
+            }
+        }
+    }
+
+    fun deleteWebSeries(seriesId: String, onComplete: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            repository.deleteSeriesFromFirebase(seriesId) { success ->
+                if (success) {
+                    _webSeries.value = _webSeries.value.filter { it.id != seriesId }
+                    viewModelScope.launch {
+                        repository.saveSeriesToLocal(_webSeries.value)
+                    }
+                }
+                onComplete(success)
+            }
+        }
+    }
+
+    fun clearAllMovies(onComplete: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            repository.clearAllMoviesFromFirebase { success ->
+                if (success) {
+                    _movies.value = emptyList()
+                    _categories.value = emptyList()
+                    viewModelScope.launch {
+                        repository.saveMoviesToLocal(emptyList())
+                    }
+                }
+                onComplete(success)
+            }
+        }
+    }
+
+    fun clearAllWebSeries(onComplete: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            repository.clearAllSeriesFromFirebase { success ->
+                if (success) {
+                    _webSeries.value = emptyList()
+                    viewModelScope.launch {
+                        repository.saveSeriesToLocal(emptyList())
+                    }
+                }
+                onComplete(success)
+            }
+        }
     }
 
     // ------------------ PROFILE DATA MANAGERS ------------------
