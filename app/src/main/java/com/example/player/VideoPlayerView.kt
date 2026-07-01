@@ -137,7 +137,7 @@ fun OTTVideoPlayer(
     var orientationMode by remember { mutableStateOf(OrientationMode.LANDSCAPE) }
     var showControls by remember { mutableStateOf(true) }
     var isLocked by remember { mutableStateOf(false) }
-    var isPlaying by remember { mutableStateOf(true) }
+    var isPlaying by remember { mutableStateOf(false) }
     var isBuffering by remember { mutableStateOf(true) }
     var currentPosition by remember { mutableStateOf(0L) }
     var duration by remember { mutableStateOf(0L) }
@@ -260,6 +260,10 @@ fun OTTVideoPlayer(
                 isBuffering = state == Player.STATE_BUFFERING
                 if (state == Player.STATE_READY) {
                     playbackError = null
+                    isBuffering = false
+                    if (exoPlayer.playWhenReady) {
+                        showControls = false
+                    }
                     if (initialProgress > 0f && !hasSeeked) {
                         val dur = exoPlayer.duration
                         if (dur > 0) {
@@ -271,6 +275,10 @@ fun OTTVideoPlayer(
             }
             override fun onIsPlayingChanged(playing: Boolean) {
                 isPlaying = playing
+                if (playing) {
+                    isBuffering = false
+                    showControls = false
+                }
             }
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
                 android.util.Log.e("VideoPlayerView", "Playback failed on URL: $currentVideoUrl", error)
@@ -416,6 +424,7 @@ fun OTTVideoPlayer(
                 PlayerView(ctx).apply {
                     player = exoPlayer
                     useController = false
+                    setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
                     this.resizeMode = resizeMode
                     layoutParams = FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
                 }
@@ -426,7 +435,7 @@ fun OTTVideoPlayer(
             modifier = Modifier.fillMaxSize()
         )
 
-        if (isBuffering) {
+        if (isBuffering && !isPlaying) {
             CircularProgressIndicator(
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.align(Alignment.Center)
