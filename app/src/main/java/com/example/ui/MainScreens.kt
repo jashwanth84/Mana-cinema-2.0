@@ -78,7 +78,7 @@ data class NavigationState(
     val selectedEpisode: Episode? = null
 )
 
-@OptIn(UnstableApi::class)
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 @Composable
 fun MiniPlayerView(
     videoUrl: String,
@@ -442,6 +442,11 @@ fun MainAppContainer(
                             val savedRecord = continueWatchingList.find { it.contentId == epId }
                             val initialProg = savedRecord?.progress ?: 0f
 
+                            val currentEpIndex = series.episodes.indexOfFirst { it.season == ep.season && it.episode == ep.episode }
+                            val nextEpisode = if (currentEpIndex != -1 && currentEpIndex + 1 < series.episodes.size) {
+                                series.episodes[currentEpIndex + 1]
+                            } else null
+
                             VideoPlayerView(
                                 videoUrl = ep.link,
                                 title = "${series.title} S${ep.season}E${ep.episode}",
@@ -467,6 +472,12 @@ fun MainAppContainer(
                                     )
                                     playWithAd {
                                         navigationStack.removeAt(navigationStack.size - 1)
+                                    }
+                                },
+                                onNextEpisodeClick = nextEpisode?.let { nextEp ->
+                                    {
+                                        val top = navigationStack.last()
+                                        navigationStack[navigationStack.size - 1] = top.copy(selectedEpisode = nextEp)
                                     }
                                 },
                                 modifier = Modifier.fillMaxSize()
