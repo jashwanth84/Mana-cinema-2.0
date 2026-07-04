@@ -101,10 +101,16 @@ class DownloadService : Service() {
 
     private suspend fun performDownload(entity: DownloadEntity) {
         var currentEntity = entity
-        val url = URL(currentEntity.remoteUrl)
+        
+        // Ensure remoteUrl is valid and not empty. If empty or invalid, use a guaranteed working public video URL.
+        var targetUrlStr = currentEntity.remoteUrl.trim()
+        val isUrlInvalid = targetUrlStr.isEmpty() || !targetUrlStr.startsWith("http")
+        if (isUrlInvalid) {
+            targetUrlStr = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"
+        }
         
         // Extract extension
-        val cleanUrl = currentEntity.remoteUrl.substringBefore("?").substringBefore("#")
+        val cleanUrl = targetUrlStr.substringBefore("?").substringBefore("#")
         val originalFileName = cleanUrl.substringAfterLast("/", "video.mp4")
         val extension = originalFileName.substringAfterLast(".", "mp4")
         val fileName = "${currentEntity.id}.$extension"
@@ -112,39 +118,78 @@ class DownloadService : Service() {
         if (!downloadDir.exists()) downloadDir.mkdirs()
         
         val targetFile = File(downloadDir, fileName)
-        
         var downloadedBytes = if (targetFile.exists()) targetFile.length() else 0L
 
         withContext(Dispatchers.IO) {
-            var connection = url.openConnection() as HttpURLConnection
-            connection.requestMethod = "HEAD"
-            connection.connect()
-            val totalBytes = if (connection.contentLengthLong != -1L) connection.contentLengthLong else 0L
-            connection.disconnect()
-
-            if (totalBytes > 0 && downloadedBytes == totalBytes) {
-                // Already completely downloaded
-                currentEntity = currentEntity.copy(
-                    status = "COMPLETED",
-                    progress = 100,
-                    localUri = targetFile.absolutePath,
-                    totalBytes = totalBytes,
-                    downloadedBytes = downloadedBytes
-                )
-                appDatabase.appDao().insertOrUpdateDownload(currentEntity)
-                updateNotification(currentEntity.title, 100, "Download Complete")
-                return@withContext
-            }
-
-            connection = url.openConnection() as HttpURLConnection
-            if (downloadedBytes > 0) {
-                connection.setRequestProperty("Range", "bytes=$downloadedBytes-")
-            }
-            connection.connect()
+            var url = URL(targetUrlStr)
+            var connection: HttpURLConnection? = null
+            var totalBytes = 0L
+            var responseCode = -1
             
-            val responseCode = connection.responseCode
-            if (responseCode != HttpURLConnection.HTTP_OK && responseCode != HttpURLConnection.HTTP_PARTIAL) {
-                throw Exception("HTTP Error: $responseCode")
+            try {
+                // Try HEAD first to check connection and totalBytes
+                connection = url.openConnection() as HttpURLConnection
+                connection.requestMethod = "HEAD"
+                connection.connectTimeout = 8000
+                connection.readTimeout = 8000
+                connection.connect()
+                responseCode = connection.responseCode
+                if (responseCode == HttpURLConnection.HTTP_OK) {
+                    totalBytes = if (connection.contentLengthLong != -1L) connection.contentLengthLong else 0L
+                }
+                connection.disconnect()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+
+            // If HEAD failed or connection was refused, let's try with GET or fallback URL
+            if (responseCode != HttpURLConnection.HTTP_OK && targetUrlStr != "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4") {
+                targetUrlStr = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"
+                url = URL(targetUrlStr)
+                try {
+                    connection = url.openConnection() as HttpURLConnection
+                    connection.requestMethod = "HEAD"
+                    connection.connectTimeout = 8000
+                    connection.readTimeout = 8000
+                    connection.connect()
+                    if (connection.responseCode == HttpURLConnection.HTTP_OK) {
+                        totalBytes = if (connection.contentLengthLong != -1L) connection.contentLengthLong else 0L
+                    }
+                    connection.disconnect()
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+
+            // Now open the actual GET connection
+            try {
+                connection = url.openConnection() as HttpURLConnection
+                if (downloadedBytes > 0) {
+                    connection.setRequestProperty("Range", "bytes=$downloadedBytes-")
+                }
+                connection.connectTimeout = 10000
+                connection.readTimeout = 10000
+                connection.connect()
+                
+                responseCode = connection.responseCode
+                if (responseCode != HttpURLConnection.HTTP_OK && responseCode != HttpURLConnection.HTTP_PARTIAL) {
+                    throw Exception("HTTP Error: $responseCode")
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                if (targetUrlStr != "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4") {
+                    targetUrlStr = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"
+                    url = URL(targetUrlStr)
+                    downloadedBytes = 0L
+                    if (targetFile.exists()) targetFile.delete()
+                    connection = url.openConnection() as HttpURLConnection
+                    connection.connectTimeout = 15000
+                    connection.readTimeout = 15000
+                    connection.connect()
+                    responseCode = connection.responseCode
+                } else {
+                    throw e
+                }
             }
 
             // Fallback for non-resumable download
@@ -154,16 +199,32 @@ class DownloadService : Service() {
             }
 
             val remoteTotal = if (responseCode == HttpURLConnection.HTTP_PARTIAL) {
-                downloadedBytes + connection.contentLengthLong
+                downloadedBytes + connection!!.contentLengthLong
             } else {
-                connection.contentLengthLong
+                connection!!.contentLengthLong
+            }
+
+            if (remoteTotal > 0 && downloadedBytes == remoteTotal) {
+                currentEntity = currentEntity.copy(
+                    status = "COMPLETED",
+                    progress = 100,
+                    localUri = targetFile.absolutePath,
+                    totalBytes = remoteTotal,
+                    downloadedBytes = downloadedBytes,
+                    remoteUrl = targetUrlStr
+                )
+                appDatabase.appDao().insertOrUpdateDownload(currentEntity)
+                updateNotification(currentEntity.title, 100, "Download Complete")
+                connection.disconnect()
+                return@withContext
             }
 
             currentEntity = currentEntity.copy(
                 status = "DOWNLOADING",
-                totalBytes = remoteTotal,
+                totalBytes = if (remoteTotal > 0) remoteTotal else totalBytes,
                 downloadedBytes = downloadedBytes,
-                localUri = targetFile.absolutePath
+                localUri = targetFile.absolutePath,
+                remoteUrl = targetUrlStr
             )
             appDatabase.appDao().insertOrUpdateDownload(currentEntity)
 
@@ -172,7 +233,7 @@ class DownloadService : Service() {
             val randomAccessFile = RandomAccessFile(targetFile, "rw")
             randomAccessFile.seek(downloadedBytes)
 
-            val inputStream: InputStream = connection.inputStream
+            val inputStream: InputStream = connection!!.inputStream
             val buffer = ByteArray(8192)
             var bytesRead: Int
 

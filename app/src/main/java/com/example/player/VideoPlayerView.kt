@@ -1031,7 +1031,13 @@ fun OTTVideoPlayer(
         }
 
         // Buffer Loading Animation
-        if (isBuffering && !isCasting) {
+        val isActuallyBuffering = isBuffering && 
+                !isPlaying && 
+                !exoPlayer.isPlaying && 
+                exoPlayer.playbackState != Player.STATE_READY && 
+                !useWebViewPlayer && 
+                !isCasting
+        if (isActuallyBuffering) {
             CircularProgressIndicator(
                 color = Color(0xFFE50914),
                 strokeWidth = 4.dp,
