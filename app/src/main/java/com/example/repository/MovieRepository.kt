@@ -274,7 +274,7 @@ class MovieRepository(context: Context) {
     }
 
     // Cache sync helpers
-    suspend fun saveMoviesToLocal(movies: List<Movie>) {
+    suspend fun saveMoviesToLocal(movies: List<Movie>) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
         val entities = movies.map {
             CachedMovieEntity(
                 id = it.id,
@@ -295,7 +295,7 @@ class MovieRepository(context: Context) {
         appDao.insertMovies(entities)
     }
 
-    suspend fun saveSeriesToLocal(series: List<WebSeries>) {
+    suspend fun saveSeriesToLocal(series: List<WebSeries>) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
         val entities = series.map { s ->
             val arr = JSONArray()
             s.episodes.forEach { ep ->

@@ -236,18 +236,18 @@ fun OTTVideoPlayer(
 
     val fallbackSources = remember {
         listOf(
-            Pair("Server 1 (HLS 1080p - Sintel)", "https://bitdash-a.akamaihd.net/content/sintel/hls/playlist.m3u8"),
-            Pair("Server 2 (HLS 1080p - Mux)", "https://test-streams.mux.dev/x36xhg/x36xhg.m3u8"),
-            Pair("Server 3 (HLS 720p - Tears of Steel)", "https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/tears-of-steel.ism/.m3u8"),
-            Pair("Server 4 (MP4 - Elephants Dream)", "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4"),
-            Pair("Server 5 (MP4 - Big Buck Bunny)", "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4")
+            Pair("Server 1 (Google Premium CDN - Tears of Steel 1080p)", "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4"),
+            Pair("Server 2 (Google Premium CDN - Big Buck Bunny 1080p)", "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"),
+            Pair("Server 3 (Google Premium CDN - Elephants Dream 1080p)", "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4"),
+            Pair("Server 4 (Mux Fast CDN - HLS 1080p)", "https://test-streams.mux.dev/x36xhg/x36xhg.m3u8"),
+            Pair("Server 5 (Akamai CDN - HLS Sintel 1080p)", "https://bitdash-a.akamaihd.net/content/sintel/hls/playlist.m3u8")
         )
     }
 
     var useWebViewPlayer by remember { mutableStateOf(false) }
 
     var currentVideoUrl by remember(videoUrl) {
-        val resolved = if (videoUrl.isNotBlank()) videoUrl else "https://bitdash-a.akamaihd.net/content/sintel/hls/playlist.m3u8"
+        val resolved = if (videoUrl.isNotBlank()) videoUrl else "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4"
         mutableStateOf(resolved)
     }
     var playbackError by remember { mutableStateOf<String?>(null) }
@@ -255,7 +255,7 @@ fun OTTVideoPlayer(
 
     LaunchedEffect(videoUrl) {
         if (videoUrl.isBlank()) {
-            Toast.makeText(context, "No stream URL configured in database. Using backup high-speed Server 1.", Toast.LENGTH_LONG).show()
+            Toast.makeText(context, "Using high-speed Server 1 (Google Premium CDN) for playback.", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -372,20 +372,22 @@ fun OTTVideoPlayer(
     val exoPlayer = remember {
         trustAllHostsAndCertificates()
         
-        // Setup high efficiency buffer sizes for slow connections
+        // Setup high efficiency buffer sizes for slow connections and rapid startup
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(
-                15000, // 15s min buffer
-                50000, // 50s max buffer
-                2000,  // 2s playback start buffer
-                4000   // 4s re-buffer threshold
-            ).build()
+                2500,  // 2.5s min buffer
+                15000, // 15s max buffer
+                1000,  // 1s playback start buffer
+                1500   // 1.5s re-buffer threshold
+            )
+            .setPrioritizeTimeOverSizeThresholds(true)
+            .build()
 
         val dshf = DefaultHttpDataSource.Factory()
             .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
             .setAllowCrossProtocolRedirects(true)
-            .setConnectTimeoutMs(15000)
-            .setReadTimeoutMs(15000)
+            .setConnectTimeoutMs(5000)  // lowered to 5s to detect dead servers quickly
+            .setReadTimeoutMs(5000)     // lowered to 5s to detect dead/slow servers quickly
         
         val dsf = DefaultDataSource.Factory(context, dshf)
         val rf = DefaultRenderersFactory(context)
@@ -558,6 +560,10 @@ fun OTTVideoPlayer(
             useWebViewPlayer = false
             if (currentVideoUrl.isNotBlank()) {
                 isBuffering = true
+                // Reset player state and stop ongoing downloads to release network bandwidth immediately!
+                exoPlayer.stop()
+                exoPlayer.clearMediaItems()
+                
                 val uri = if (currentVideoUrl.startsWith("/")) {
                     android.net.Uri.fromFile(java.io.File(currentVideoUrl))
                 } else {
@@ -879,7 +885,7 @@ fun OTTVideoPlayer(
                         onClick = {
                             // Let user toggle web player off and force native fallback if desired
                             useWebViewPlayer = false
-                            currentVideoUrl = "https://bitdash-a.akamaihd.net/content/sintel/hls/playlist.m3u8"
+                            currentVideoUrl = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4"
                             playbackError = null
                         },
                         modifier = Modifier
